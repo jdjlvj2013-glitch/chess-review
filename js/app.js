@@ -389,6 +389,23 @@ function formatPv(fen, pv) {
   }
 }
 
+
+function scrollActiveMoveIntoList() {
+  const box = els.moveList;
+  const active = box && box.querySelector(".move-san.active");
+  if (!box || !active) return;
+  const boxRect = box.getBoundingClientRect();
+  const elRect = active.getBoundingClientRect();
+  const relTop = elRect.top - boxRect.top + box.scrollTop;
+  const relBottom = relTop + active.offsetHeight;
+  const pad = 6;
+  if (relTop < box.scrollTop + pad) {
+    box.scrollTop = Math.max(0, relTop - pad);
+  } else if (relBottom > box.scrollTop + box.clientHeight - pad) {
+    box.scrollTop = relBottom - box.clientHeight + pad;
+  }
+}
+
 function moveListSignature() {
   return state.moves.map((m, i) => `${m.san}:${state.reviews[i]?.classification || ""}`).join("|");
 }
@@ -402,7 +419,7 @@ function renderMoveList() {
       btn.classList.toggle("active", state.ply === ply);
     });
     const active = els.moveList.querySelector(".move-san.active");
-    if (active) active.scrollIntoView({ block: "nearest" });
+    if (active) scrollActiveMoveIntoList();
     return;
   }
   const parts = [];
@@ -428,7 +445,7 @@ function renderMoveList() {
   els.moveList.innerHTML = parts.join("");
   els.moveList.dataset.sig = sig;
   const active = els.moveList.querySelector(".move-san.active");
-  if (active) active.scrollIntoView({ block: "nearest" });
+  if (active) scrollActiveMoveIntoList();
 }
 
 function renderGraph() {

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, devices } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -68,4 +68,66 @@ test("Play auto-plays, shows badges, Space pauses, and clicking a move pauses", 
   await page.click("#nav-next");
   await page.waitForTimeout(350);
   await expect(page.locator(".board-badge")).toBeVisible();
+});
+
+async function assertPlaybackDoesNotScrollPage(page) {
+  const state0 = await analyzePgn(page, blunderPgn, "12");
+  expect(state0.moveCount).toBeGreaterThan(3);
+  await page.evaluate(() => window.__chessReview.goTo(0, { instant: true }));
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  });
+  await expect.poll(async () => page.evaluate(() => window.scrollY || document.documentElement.scrollTop)).toBe(0);
+  await page.selectOption("#play-speed", "500");
+  await page.locator("#nav-play").click({ force: true });
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().playing)).toBe(true);
+
+  const start = Date.now();
+  let lastPly = 0;
+  while (Date.now() - start < 12000) {
+    const { playing, ply, y } = await page.evaluate(() => ({
+      playing: window.__chessReview.getState().playing,
+      ply: window.__chessReview.getState().ply,
+      y: window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0,
+    }));
+    expect(y, `window scrolled to ${y} at ply ${ply}`).toBe(0);
+    lastPly = ply;
+    if (!playing && ply >= 1) break;
+    await page.waitForTimeout(80);
+  }
+  expect(lastPly).toBeGreaterThanOrEqual(2);
+  const finalY = await page.evaluate(() => window.scrollY || document.documentElement.scrollTop || 0);
+  expect(finalY).toBe(0);
+}
+
+test.describe("playback does not scroll the page", () => {
+  test("desktop: Play keeps window.scrollY at 0", async ({ page }) => {
+    await assertPlaybackDoesNotScrollPage(page);
+  });
+});
+
+function phoneUse(device) {
+  return {
+    viewport: device.viewport,
+    userAgent: device.userAgent,
+    isMobile: device.isMobile,
+    hasTouch: device.hasTouch,
+    deviceScaleFactor: device.deviceScaleFactor,
+  };
+}
+
+test.describe("playback does not scroll the page on a phone", () => {
+  test.use(phoneUse(devices["iPhone 13"]));
+  test("iPhone: Play keeps window.scrollY at 0", async ({ page }) => {
+    await assertPlaybackDoesNotScrollPage(page);
+  });
+});
+
+test.describe("playback does not scroll the page on a Pixel", () => {
+  test.use(phoneUse(devices["Pixel 7"]));
+  test("Pixel: Play keeps window.scrollY at 0", async ({ page }) => {
+    await assertPlaybackDoesNotScrollPage(page);
+  });
 });
