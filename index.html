@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chess Review</title>
+    <meta name="description" content="Paste a chess game and review every move with Stockfish, using chess.com-style classifications." />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect rx='8' width='32' height='32' fill='%237dcaa0'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18'%3E♞%3C/text%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">♞</div>
+        <div>
+          <h1>Chess Review</h1>
+          <p>Stockfish in your browser · chess.com-style labels</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="ghost" id="new-game">New game</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="import-panel" class="card">
+        <div class="import-grid">
+          <label class="field">
+            PGN or move list
+            <textarea id="pgn-input" placeholder="Paste a PGN, or moves like 1. e4 e5 2. Nf3 Nc6 …" spellcheck="false"></textarea>
+          </label>
+          <div class="row">
+            <label class="field">
+              Starting FEN (optional)
+              <input id="fen-input" type="text" placeholder="Leave blank for the standard starting position" spellcheck="false" />
+            </label>
+            <label class="field" style="flex: 0 0 140px">
+              Depth
+              <select id="depth">
+                <option value="12">12 — faster</option>
+                <option value="14">14</option>
+                <option value="16">16</option>
+                <option value="18" selected>18 — default</option>
+                <option value="20">20 — slower</option>
+                <option value="22">22</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="btn ghost">
+              Upload .pgn
+              <input id="pgn-file" type="file" accept=".pgn,text/plain" hidden />
+            </label>
+            <div class="samples">
+              <button type="button" class="ghost" data-sample="fischer">Byrne vs Fischer, 1956</button>
+              <button type="button" class="ghost" data-sample="blunders">Short blunder demo</button>
+            </div>
+            <div style="flex: 1"></div>
+            <button type="button" class="primary" id="analyze-btn">Analyze game</button>
+          </div>
+          <div id="import-error" class="error" hidden></div>
+        </div>
+      </section>
+
+      <section id="review-panel" hidden>
+        <div id="progress-wrap" class="progress" hidden>
+          <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+          <div id="progress-text" class="progress-text"></div>
+        </div>
+
+        <div class="review-grid">
+          <div class="board-col">
+            <div class="board-stage">
+              <div class="eval-bar" title="Evaluation from White's side">
+                <div id="eval-fill" class="eval-fill" style="height: 50%"></div>
+                <div id="eval-label" class="eval-label">0.00</div>
+              </div>
+              <div id="board"></div>
+            </div>
+            <div class="nav">
+              <div id="ply-label">Start</div>
+              <div class="btns">
+                <button type="button" class="ghost" id="flip-board" title="Flip board">Flip</button>
+                <button type="button" class="ghost" id="nav-start" title="Start (Home)">⏮</button>
+                <button type="button" class="ghost" id="nav-prev" title="Previous (←)">◀</button>
+                <button type="button" class="ghost" id="nav-next" title="Next (→)">▶</button>
+                <button type="button" class="ghost" id="nav-end" title="End (End)">⏭</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-col">
+            <p id="event-meta" class="event-meta"></p>
+            <div class="players">
+              <div class="player-card">
+                <div class="who">White</div>
+                <h2 id="white-name">White</h2>
+                <div id="white-accuracy" class="accuracy">–</div>
+                <div id="white-counts" class="counts"></div>
+              </div>
+              <div class="player-card">
+                <div class="who">Black</div>
+                <h2 id="black-name">Black</h2>
+                <div id="black-accuracy" class="accuracy">–</div>
+                <div id="black-counts" class="counts"></div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 10px">
+              <svg id="eval-graph" viewBox="0 0 320 88" role="img" aria-label="Evaluation graph"></svg>
+            </div>
+
+            <div class="card move-card">
+              <div id="class-title"></div>
+              <p id="class-detail"></p>
+              <p id="best-line"></p>
+              <div id="move-list" class="move-list"></div>
+            </div>
+          </div>
+        </div>
+        <footer class="hint">Use the arrow keys, Home and End to step through the game. The teal arrow is the engine’s best move.</footer>
+      </section>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

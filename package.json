@@ -1,0 +1,17 @@
+{
+  "name": "chess-review",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser chess game review with Stockfish and chess.com-style move labels.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 4173",
+    "test": "node --test tests/classify.test.js tests/game.test.js && npx playwright test",
+    "test:unit": "node --test tests/classify.test.js tests/game.test.js",
+    "test:e2e": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}
