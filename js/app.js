@@ -54,6 +54,8 @@ const els = {
   prev: document.getElementById("nav-prev"),
   next: document.getElementById("nav-next"),
   end: document.getElementById("nav-end"),
+  play: document.getElementById("nav-play"),
+  playSpeed: document.getElementById("play-speed"),
 };
 
 const state = {
@@ -67,6 +69,8 @@ const state = {
   canceled: false,
   names: { white: "White", black: "Black" },
   summary: null,
+  playing: false,
+  playSpeed: 1000,
 };
 
 const engine = new StockfishEngine();
@@ -119,6 +123,7 @@ async function startReview() {
   state.canceled = false;
   state.names = playerNames(game.headers);
   state.summary = null;
+  pausePlayback();
 
   els.importPanel.hidden = true;
   els.reviewPanel.hidden = false;
@@ -140,7 +145,7 @@ async function startReview() {
         state.summary = summarize(state.reviews.filter(Boolean));
       }
       if (state.ply === 0 && i === 1) state.ply = 1;
-      renderAll();
+      renderAll({ type: "none" });
     }
     setProgress(total, total, "Analysis complete");
     setTimeout(() => {
@@ -253,27 +258,28 @@ function renderMeta() {
   els.eventMeta.textContent = bits.join(" · ");
 }
 
-function renderBoard() {
+function renderBoard(transition = { type: "none" }) {
   const fen = currentFen();
-  board.setPosition(fen);
   const mv = state.ply > 0 ? state.moves[state.ply - 1] : null;
-  board.setLastMove(mv?.from, mv?.to);
   const rev = currentReview();
+  let badge = null;
   if (rev && rev.classification) {
     const meta = CLASS_META[rev.classification];
-    board.setBadge(rev.to, rev.classification, meta.color, meta.badge);
-  } else {
-    board.setBadge(null);
+    badge = { square: rev.to, classification: rev.classification, color: meta.color, symbol: meta.badge };
   }
+  let bestArrow = null;
   if (rev && rev.bestUci && rev.bestUci !== rev.uci) {
-    const sq = uciToFromTo(rev.bestUci);
-    board.setBestArrow(sq?.from, sq?.to);
+    bestArrow = uciToFromTo(rev.bestUci);
   } else if (state.ply === 0 && state.positions[0]?.bestMove) {
-    const sq = uciToFromTo(state.positions[0].bestMove);
-    board.setBestArrow(sq?.from, sq?.to);
-  } else {
-    board.setBestArrow(null);
+    bestArrow = uciToFromTo(state.positions[0].bestMove);
   }
+  board.update({
+    fen,
+    lastMove: mv ? { from: mv.from, to: mv.to } : null,
+    badge,
+    bestArrow,
+    transition,
+  });
 
   const ev = currentEvalWhite();
   const ep = ev ? expectedPoints(ev) : 0.5;
@@ -383,7 +389,22 @@ function formatPv(fen, pv) {
   }
 }
 
+function moveListSignature() {
+  return state.moves.map((m, i) => `${m.san}:${state.reviews[i]?.classification || ""}`).join("|");
+}
+
 function renderMoveList() {
+  const sig = moveListSignature();
+  const buttons = els.moveList.querySelectorAll(".move-san");
+  if (els.moveList.dataset.sig === sig && buttons.length === state.moves.length) {
+    buttons.forEach((btn) => {
+      const ply = Number(btn.getAttribute("data-ply"));
+      btn.classList.toggle("active", state.ply === ply);
+    });
+    const active = els.moveList.querySelector(".move-san.active");
+    if (active) active.scrollIntoView({ block: "nearest" });
+    return;
+  }
   const parts = [];
   for (let i = 0; i < state.moves.length; i++) {
     const m = state.moves[i];
@@ -405,6 +426,9 @@ function renderMoveList() {
     );
   }
   els.moveList.innerHTML = parts.join("");
+  els.moveList.dataset.sig = sig;
+  const active = els.moveList.querySelector(".move-san.active");
+  if (active) active.scrollIntoView({ block: "nearest" });
 }
 
 function renderGraph() {
@@ -439,16 +463,31 @@ function renderGraph() {
   const areaTop = `M${pts[0].x.toFixed(1)},${midY} ` + pts.map((p) => `L${p.x.toFixed(1)},${Math.min(p.y, midY).toFixed(1)}`).join(" ") + ` L${pts.at(-1).x.toFixed(1)},${midY} Z`;
   const areaBot = `M${pts[0].x.toFixed(1)},${midY} ` + pts.map((p) => `L${p.x.toFixed(1)},${Math.max(p.y, midY).toFixed(1)}`).join(" ") + ` L${pts.at(-1).x.toFixed(1)},${midY} Z`;
   const cur = pts[Math.min(state.ply, pts.length - 1)];
+  const sig = `${n}:${line}`;
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  svg.innerHTML = `
-    <rect class="graph-bg" x="0" y="0" width="${w}" height="${h}" rx="8"/>
-    <line class="graph-mid" x1="${pad}" x2="${w - pad}" y1="${midY}" y2="${midY}"/>
-    <path class="graph-area white" d="${areaTop}"/>
-    <path class="graph-area black" d="${areaBot}"/>
-    <path class="graph-line" d="${line}"/>
-    <line class="graph-cursor" x1="${cur.x}" x2="${cur.x}" y1="${pad}" y2="${h - pad}"/>
-    <circle class="graph-dot" cx="${cur.x}" cy="${cur.y}" r="3.2"/>
-  `;
+  if (svg.dataset.sig !== sig) {
+    svg.innerHTML = `
+      <rect class="graph-bg" x="0" y="0" width="${w}" height="${h}" rx="8"/>
+      <line class="graph-mid" x1="${pad}" x2="${w - pad}" y1="${midY}" y2="${midY}"/>
+      <path class="graph-area white" d="${areaTop}"/>
+      <path class="graph-area black" d="${areaBot}"/>
+      <path class="graph-line" d="${line}"/>
+      <line class="graph-cursor" x1="${cur.x}" x2="${cur.x}" y1="${pad}" y2="${h - pad}"/>
+      <circle class="graph-dot" cx="${cur.x}" cy="${cur.y}" r="3.2"/>
+    `;
+    svg.dataset.sig = sig;
+  } else {
+    const cursor = svg.querySelector(".graph-cursor");
+    const dot = svg.querySelector(".graph-dot");
+    if (cursor) {
+      cursor.setAttribute("x1", String(cur.x));
+      cursor.setAttribute("x2", String(cur.x));
+    }
+    if (dot) {
+      dot.setAttribute("cx", String(cur.x));
+      dot.setAttribute("cy", String(cur.y));
+    }
+  }
   svg.onclick = (ev) => {
     const rect = svg.getBoundingClientRect();
     const x = ((ev.clientX - rect.left) / rect.width) * w;
@@ -465,18 +504,88 @@ function renderGraph() {
   };
 }
 
-function renderAll() {
-  renderBoard();
+function renderAll(transition = { type: "none" }) {
+  renderBoard(transition);
   renderAccuracy();
   renderMoveInfo();
   renderMoveList();
   renderGraph();
+  updatePlayButton();
   exposeDebug();
 }
 
-function goTo(ply) {
-  state.ply = Math.max(0, Math.min(state.moves.length, ply));
-  renderAll();
+function goTo(ply, opts = {}) {
+  const target = Math.max(0, Math.min(state.moves.length, ply));
+  if (!opts.fromPlay) pausePlayback();
+  const from = state.ply;
+  if (target === from) {
+    if (!opts.silent) renderAll({ type: "none" });
+    return;
+  }
+  const delta = target - from;
+  let transition;
+  if (opts.instant || opts.animate === "none") transition = { type: "none" };
+  else if (Math.abs(delta) === 1) {
+    transition = {
+      type: "move",
+      move: state.moves[delta > 0 ? from : target],
+      reverse: delta < 0,
+      duration: 260,
+    };
+  } else {
+    transition = { type: "fade", duration: 160 };
+  }
+  state.ply = target;
+  renderAll(transition);
+}
+
+let playTimer = 0;
+
+function pausePlayback() {
+  if (playTimer) {
+    window.clearTimeout(playTimer);
+    playTimer = 0;
+  }
+  const was = state.playing;
+  state.playing = false;
+  if (was) updatePlayButton();
+}
+
+function updatePlayButton() {
+  if (!els.play) return;
+  els.play.textContent = state.playing ? "❚❚ Pause" : "▶ Play";
+  els.play.setAttribute("aria-pressed", state.playing ? "true" : "false");
+  els.play.title = state.playing ? "Pause (Space)" : "Play (Space)";
+}
+
+function playTick() {
+  playTimer = 0;
+  if (!state.playing) return;
+  if (state.ply >= state.moves.length) {
+    pausePlayback();
+    return;
+  }
+  goTo(state.ply + 1, { fromPlay: true });
+  if (state.ply >= state.moves.length) {
+    pausePlayback();
+    return;
+  }
+  playTimer = window.setTimeout(playTick, state.playSpeed);
+}
+
+function togglePlay() {
+  if (state.playing) {
+    pausePlayback();
+    return;
+  }
+  if (!state.moves.length || els.reviewPanel.hidden) return;
+  if (state.ply >= state.moves.length) {
+    goTo(0, { instant: true });
+  }
+  state.playing = true;
+  state.playSpeed = Number(els.playSpeed?.value) || 1000;
+  updatePlayButton();
+  playTick();
 }
 
 function exposeDebug() {
@@ -503,13 +612,18 @@ function exposeDebug() {
       ),
       summary: state.summary,
       names: state.names,
+      playing: state.playing,
+      playSpeed: state.playSpeed,
     }),
     goTo,
+    togglePlay,
+    pausePlayback,
     ready: !state.analyzing && state.reviews.length > 0 && state.reviews.every(Boolean),
   };
 }
 
 function resetToImport() {
+  pausePlayback();
   state.canceled = true;
   engine.stop();
   state.moves = [];
@@ -539,6 +653,10 @@ els.start.addEventListener("click", () => goTo(0));
 els.prev.addEventListener("click", () => goTo(state.ply - 1));
 els.next.addEventListener("click", () => goTo(state.ply + 1));
 els.end.addEventListener("click", () => goTo(state.moves.length));
+els.play.addEventListener("click", togglePlay);
+els.playSpeed.addEventListener("change", () => {
+  state.playSpeed = Number(els.playSpeed.value) || 1000;
+});
 els.moveList.addEventListener("click", (ev) => {
   const btn = ev.target.closest("[data-ply]");
   if (btn) goTo(Number(btn.getAttribute("data-ply")));
@@ -548,7 +666,10 @@ document.addEventListener("keydown", (ev) => {
   if (els.reviewPanel.hidden) return;
   const tag = ev.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  if (ev.key === "ArrowLeft") {
+  if (ev.key === " " || ev.code === "Space") {
+    ev.preventDefault();
+    togglePlay();
+  } else if (ev.key === "ArrowLeft") {
     ev.preventDefault();
     goTo(state.ply - 1);
   } else if (ev.key === "ArrowRight") {

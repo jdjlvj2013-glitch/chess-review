@@ -83,8 +83,17 @@
                 <button type="button" class="ghost" id="flip-board" title="Flip board">Flip</button>
                 <button type="button" class="ghost" id="nav-start" title="Start (Home)">⏮</button>
                 <button type="button" class="ghost" id="nav-prev" title="Previous (←)">◀</button>
+                <button type="button" class="primary" id="nav-play" title="Play (Space)" aria-pressed="false">▶ Play</button>
                 <button type="button" class="ghost" id="nav-next" title="Next (→)">▶</button>
                 <button type="button" class="ghost" id="nav-end" title="End (End)">⏭</button>
+                <label class="speed-field">
+                  Speed
+                  <select id="play-speed" title="Seconds per move">
+                    <option value="500">0.5s</option>
+                    <option value="1000" selected>1s</option>
+                    <option value="2000">2s</option>
+                  </select>
+                </label>
               </div>
             </div>
           </div>
@@ -118,7 +127,7 @@
             </div>
           </div>
         </div>
-        <footer class="hint">Use the arrow keys, Home and End to step through the game. The teal arrow is the engine’s best move.</footer>
+        <footer class="hint">Use the arrow keys, Home and End to step through the game, or press Space to play and pause. The teal arrow is the engine’s best move.</footer>
       </section>
     </main>
 

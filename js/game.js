@@ -105,6 +105,11 @@ function collectMoves(startFen, finalChess) {
       promotion: m.promotion,
     });
     const uci = m.from + m.to + (m.promotion || "");
+    const flags = (played && played.flags) || m.flags || "";
+    const enPassant = flags.includes("e");
+    const capturedSq = enPassant
+      ? m.to[0] + m.from[1]
+      : (m.captured || (played && played.captured) ? m.to : null);
     moves.push({
       san: played ? played.san : m.san,
       uci,
@@ -113,7 +118,10 @@ function collectMoves(startFen, finalChess) {
       promotion: m.promotion || null,
       color: m.color,
       piece: m.piece,
-      captured: m.captured || null,
+      captured: (played && played.captured) || m.captured || null,
+      capturedSquare: capturedSq,
+      enPassant,
+      flags,
       fenBefore,
       fenAfter: walker.fen(),
       legalCount,

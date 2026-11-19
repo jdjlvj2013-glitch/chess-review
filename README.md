@@ -30,7 +30,7 @@ Then visit http://127.0.0.1:4173/. It also works offline once the page and engin
   - Miss **✕**
   - Blunder **??** (red)
 - Show per-player accuracy and a count of each classification.
-- An interactive board with SVG pieces, a classification badge on the destination square, an arrow for the engine’s best move, an evaluation bar, a clickable evaluation graph, a colored move list, and the best line for the current move. Arrow keys, Home, and End step through the game.
+- An interactive board with the official CBurnett piece set (the classic pieces used on Lichess), a classification badge on the destination square, an arrow for the engine’s best move, an evaluation bar, a clickable evaluation graph, a colored move list, and the best line for the current move. Pieces glide from square to square with easing; captures, castling, en passant and promotions animate cleanly, and stepping backward plays the move in reverse. Jumping on the graph or move list uses a short fade so the board does not flicker through every ply. Arrow keys, Home, and End step through the game. A Play/Pause button (or the Space key) auto-plays at 0.5s, 1s, or 2s per move, keeps the eval bar, graph cursor, move-list highlight and quality badge in sync, and stops at the end. Clicking a move or using the arrow keys pauses playback.
 
 ## How classifications work
 
@@ -108,4 +108,4 @@ Unit tests cover the classification thresholds. Playwright loads two real games,
 
 ## License
 
-GPL-3.0-only. See `LICENSE` and `vendor/stockfish/Copying.txt`. chess.js is BSD-2-Clause (`vendor/chess.js.LICENSE`). Piece artwork follows the public-domain CBurnett set.
+GPL-3.0-only. See `LICENSE` and `vendor/stockfish/Copying.txt`. chess.js is BSD-2-Clause (`vendor/chess.js.LICENSE`). Chess piece graphics are the **CBurnett** set by Colin M.L. Burnett, in the compact form shipped by Lichess (`public/piece/cburnett`). The author published them under GFDL 1.2+, GPL 2+, the BSD licence, and CC BY-SA 3.0. This project uses them under the BSD 3-Clause license; see `vendor/cburnett/LICENSE`.

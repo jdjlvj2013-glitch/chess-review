@@ -1,24 +1,26 @@
 /**
- * Interactive SVG chessboard with CBurnett-style pieces (public domain).
+ * Interactive chessboard with official CBurnett piece SVGs and
+ * eased slide animations for stepping through a game.
  */
 
 const FILES = "abcdefgh";
-
-// Public-domain CBurnett piece paths, viewBox 0 0 45 45.
-const PIECE_SVG = {
-  wK: `<g fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="miter"><path d="M22.5 11.63V6M20 8h5" stroke-linejoin="miter"/><path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="#fff" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M12.5 37c5.5 3.5 14.5 3.5 20 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-2.5-7.5-12-10.5-16-4-3 6 6 10.5 6 10.5v7"/><path d="M12.5 30c5.5-3 14.5-3 20 0m-20 3.5c5.5-3 14.5-3 20 0m-20 3.5c5.5-3 14.5-3 20 0" fill="none"/></g>`,
-  wQ: `<g fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0zm15.5-3a2 2 0 1 1-4 0 2 2 0 1 1 4 0zM39 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0zM16 8.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0zM33 9a2 2 0 1 1-4 0 2 2 0 1 1 4 0z"/><path d="M9 26c8.5-9 21.5-9 30 0l-4 13s-5.5 5.5-11 5.5-11-5.5-11-5.5L9 26z" stroke-linecap="butt"/><path d="M9 26c0 0 4.5 7 10.5 7A13.23 13.23 0 0 0 25 24.9 13.23 13.23 0 0 0 30.5 33C36.5 33 41 26 41 26" fill="none"/><path d="M11.5 30c3.5-1.5 18-1 24 0M10.5 33.5c6-1 21.5-1 27 0M11.5 37c8-1 16.5-1 23 0" fill="none"/></g>`,
-  wR: `<g fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 39h27v-3H9v3zm3-4h21v-4H12v4zm-1-22V9h4v2h5V9h5v2h5V9h4v4"/><path d="M34 14l-3 3H14l-3-3"/><path d="M31 17v12.5H14V17" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M31 29.5 32.5 32H12.5L14 29.5"/><path d="M11 14h23" fill="none"/></g>`,
-  wB: `<g fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><g fill="#fff" stroke-linecap="butt"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 1.5 2-.19 1.94-1.5 3-1.5 3H9s-1.31-1.06-1.5-3c-.15-1.46 1.5-2 1.5-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g><path d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5" fill="none" stroke-linejoin="miter"/></g>`,
-  wN: `<g fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-1-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-2 2.5-3c1 0 1 3 1 3"/><path d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0zm5.43-9.75a.5 1.5 30 1 1-.87-.5.5 1.5 30 1 1 .87.5z" fill="#000" stroke="none"/></g>`,
-  wP: `<path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>`,
-  bK: `<g fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="miter"><path d="M22.5 11.63V6M20 8h5" stroke-linejoin="miter"/><path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="#000" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M12.5 37c5.5 3.5 14.5 3.5 20 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-2.5-7.5-12-10.5-16-4-3 6 6 10.5 6 10.5v7"/><path d="M12.5 30c5.5-3 14.5-3 20 0m-20 3.5c5.5-3 14.5-3 20 0m-20 3.5c5.5-3 14.5-3 20 0" fill="none" stroke="#fff"/></g>`,
-  bQ: `<g fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><g fill="#000"><circle cx="6" cy="12" r="2"/><circle cx="13.5" cy="8.5" r="2"/><circle cx="22.5" cy="8" r="2"/><circle cx="31.5" cy="8.5" r="2"/><circle cx="39" cy="12" r="2"/></g><path d="M9 26c8.5-9 21.5-9 30 0l-4 13s-5.5 5.5-11 5.5-11-5.5-11-5.5L9 26z" stroke-linecap="butt"/><path d="M9 26c0 0 4.5 7 10.5 7A13.23 13.23 0 0 0 25 24.9 13.23 13.23 0 0 0 30.5 33C36.5 33 41 26 41 26" fill="none" stroke="#fff"/><path d="M11.5 30c3.5-1.5 18-1 24 0M10.5 33.5c6-1 21.5-1 27 0M11.5 37c8-1 16.5-1 23 0" fill="none" stroke="#fff"/></g>`,
-  bR: `<g fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 39h27v-3H9v3zm3.5-7 1.5-2.5h17l1.5 2.5h-20zM12 31v-4h21v4H12z" stroke-linecap="butt"/><path d="M14 27v-10h17v10H14z" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M14 16.5 11 14h23l-3 2.5H14zM11 14V9h4v2h5V9h5v2h5V9h4v5H11z"/><path d="M12 35.5h21m-20-20.5h19m-18 6.5h17m-17 10.5h17M11 14h23" fill="none" stroke="#fff" stroke-width="1" stroke-linejoin="miter"/></g>`,
-  bB: `<g fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><g fill="#000" stroke-linecap="butt"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 1.5 2-.19 1.94-1.5 3-1.5 3H9s-1.31-1.06-1.5-3c-.15-1.46 1.5-2 1.5-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g><path d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5" fill="none" stroke="#fff" stroke-linejoin="miter"/></g>`,
-  bN: `<g fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-1-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-2 2.5-3c1 0 1 3 1 3"/><path d="M24.55 10.4l-.45 1.45.5.15c3.15 1 5.65 2.49 7.9 6.75S35.75 29.06 35.25 39l-.05.5h2.25l.05-.5c.5-10.06-.88-16.85-3.25-21.34-2.37-4.49-5.79-6.64-9.19-7.16l-.51-.1z" fill="#fff" stroke="none"/><path d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0zm5.43-9.75a.5 1.5 30 1 1-.87-.5.5 1.5 30 1 1 .87.5z" fill="#fff" stroke="#fff"/><path d="M24.55 10.4l-.45 1.45.5.15c3.15 1 5.65 2.49 7.9 6.75S35.75 29.06 35.25 39l-.05.5h2.25l.05-.5c.5-10.06-.88-16.85-3.25-21.34-2.37-4.49-5.79-6.64-9.19-7.16l-.51-.1z" fill="none" stroke="#fff" stroke-width="1"/></g>`,
-  bP: `<path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="#000" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>`,
+const PIECE_SRC = {
+  wK: "vendor/cburnett/wK.svg",
+  wQ: "vendor/cburnett/wQ.svg",
+  wR: "vendor/cburnett/wR.svg",
+  wB: "vendor/cburnett/wB.svg",
+  wN: "vendor/cburnett/wN.svg",
+  wP: "vendor/cburnett/wP.svg",
+  bK: "vendor/cburnett/bK.svg",
+  bQ: "vendor/cburnett/bQ.svg",
+  bR: "vendor/cburnett/bR.svg",
+  bB: "vendor/cburnett/bB.svg",
+  bN: "vendor/cburnett/bN.svg",
+  bP: "vendor/cburnett/bP.svg",
 };
+
+const DEFAULT_MOVE_MS = 260;
+const FADE_MS = 160;
 
 function fileRank(square) {
   return { file: FILES.indexOf(square[0]), rank: Number(square[1]) - 1 };
@@ -44,6 +46,39 @@ function parseFenPieces(fen) {
   return pieces;
 }
 
+function isCastle(move) {
+  const flags = move.flags || "";
+  return flags.includes("k") || flags.includes("q") || move.san === "O-O" || move.san === "O-O-O";
+}
+
+function isKingSide(move) {
+  const flags = move.flags || "";
+  return flags.includes("k") || move.san === "O-O";
+}
+
+function rookCastle(move) {
+  if (!isCastle(move)) return null;
+  const kingSide = isKingSide(move);
+  if (move.color === "w") {
+    return kingSide ? { from: "h1", to: "f1" } : { from: "a1", to: "d1" };
+  }
+  return kingSide ? { from: "h8", to: "f8" } : { from: "a8", to: "d8" };
+}
+
+function captureSquare(move) {
+  if (!move) return null;
+  const flags = move.flags || "";
+  if (flags.includes("e") || move.enPassant) {
+    return move.to[0] + move.from[1];
+  }
+  if (move.captured) return move.to;
+  return move.capturedSquare || null;
+}
+
+function pieceKey(color, type) {
+  return color + type.toUpperCase();
+}
+
 export class BoardView {
   constructor(container, { onSquare = null } = {}) {
     this.container = container;
@@ -53,38 +88,51 @@ export class BoardView {
     this.lastMove = null;
     this.bestArrow = null;
     this.badge = null;
+    this.pieces = new Map(); // square -> HTMLElement
+    this._token = 0;
+    this._badgeTimer = 0;
     this._build();
   }
 
   _build() {
     this.container.innerHTML = "";
     this.container.classList.add("board-wrap");
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 8 8");
-    svg.setAttribute("class", "chess-board");
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Chess board");
-    svg.innerHTML = `
+
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    bg.setAttribute("viewBox", "0 0 8 8");
+    bg.setAttribute("class", "chess-board board-bg");
+    bg.setAttribute("role", "img");
+    bg.setAttribute("aria-label", "Chess board");
+    bg.innerHTML = `
       <defs>
         <marker id="arrow-head" markerWidth="3.2" markerHeight="3.2" refX="1.8" refY="1.6" orient="auto">
           <path d="M0 .2 L2 1.6 L0 3 z" fill="currentColor"></path>
         </marker>
-        <filter id="piece-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0.04" dy="0.06" stdDeviation="0.04" flood-opacity="0.28"/>
-        </filter>
       </defs>
       <g class="squares"></g>
       <g class="coords"></g>
       <g class="highlights"></g>
-      <g class="pieces"></g>
       <g class="arrows"></g>
-      <g class="badges"></g>
     `;
-    this.svg = svg;
-    this.container.appendChild(svg);
+    this.svg = bg;
+
+    this.pieceLayer = document.createElement("div");
+    this.pieceLayer.className = "piece-layer";
+
+    const fg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    fg.setAttribute("viewBox", "0 0 8 8");
+    fg.setAttribute("class", "chess-board board-fg");
+    fg.setAttribute("aria-hidden", "true");
+    fg.innerHTML = `<g class="badges"></g>`;
+    this.overlay = fg;
+
+    this.container.appendChild(bg);
+    this.container.appendChild(this.pieceLayer);
+    this.container.appendChild(fg);
+
     this._drawSquares();
     this._drawCoords();
-    svg.addEventListener("click", (ev) => {
+    bg.addEventListener("click", (ev) => {
       const sq = ev.target.closest("[data-square]");
       if (sq && this.onSquare) this.onSquare(sq.getAttribute("data-square"));
     });
@@ -94,6 +142,11 @@ export class BoardView {
     const { file, rank } = fileRank(square);
     if (this.orientation === "w") return { x: file, y: 7 - rank };
     return { x: 7 - file, y: rank };
+  }
+
+  _transform(square) {
+    const { x, y } = this._xy(square);
+    return `translate(${x * 100}%, ${y * 100}%)`;
   }
 
   _drawSquares() {
@@ -122,8 +175,8 @@ export class BoardView {
     for (let i = 0; i < 8; i++) {
       const file = this.orientation === "w" ? i : 7 - i;
       const rank = this.orientation === "w" ? 8 - i : i + 1;
-      const fileOnDark = (file % 2 === 1);
-      const rankOnDark = ((this.orientation === "w" ? 7 - i : i) % 2 === 0);
+      const fileOnDark = file % 2 === 1;
+      const rankOnDark = (this.orientation === "w" ? 7 - i : i) % 2 === 0;
       const ft = document.createElementNS("http://www.w3.org/2000/svg", "text");
       ft.setAttribute("x", String(i + 0.93));
       ft.setAttribute("y", "7.92");
@@ -145,38 +198,239 @@ export class BoardView {
     this.orientation = color === "b" ? "b" : "w";
     this._drawSquares();
     this._drawCoords();
-    this.render();
+    this._drawHighlights();
+    this._drawArrow();
+    this._drawBadge();
+    this._relayoutPieces(false);
   }
 
   flip() {
     this.setOrientation(this.orientation === "w" ? "b" : "w");
   }
 
-  setPosition(fen) {
-    this.fen = fen;
-    this.render();
+  setPosition(fen, transition = { type: "none" }) {
+    this.update({ fen, transition });
   }
 
   setLastMove(from, to) {
     this.lastMove = from && to ? { from, to } : null;
-    this.render();
+    this._drawHighlights();
   }
 
   setBestArrow(from, to) {
     this.bestArrow = from && to ? { from, to } : null;
-    this.render();
+    this._drawArrow();
   }
 
   setBadge(square, classification, color, symbol) {
     this.badge = square ? { square, classification, color, symbol } : null;
-    this.render();
+    this._drawBadge();
   }
 
-  render() {
+  /**
+   * Apply a new position and decorations. `transition` is
+   * { type: 'none'|'move'|'fade', move?, reverse?, duration? }.
+   */
+  update({ fen, lastMove, badge, bestArrow, transition = { type: "none" } } = {}) {
+    if (fen) this.fen = fen;
+    this.lastMove = lastMove && lastMove.from ? lastMove : null;
+    this.bestArrow = bestArrow && bestArrow.from ? bestArrow : null;
     this._drawHighlights();
-    this._drawPieces();
-    this._drawArrow();
+
+    const next = parseFenPieces(this.fen);
+    const type = transition?.type || "none";
+    const token = ++this._token;
+
+    if (type === "move" && transition.move) {
+      this._animateMove(next, transition.move, Boolean(transition.reverse), transition.duration || DEFAULT_MOVE_MS, token);
+    } else if (type === "fade") {
+      this._crossfade(next, transition.duration || FADE_MS, token);
+    } else {
+      this._syncPieces(next, false);
+    }
+
+    const delay =
+      type === "move" ? Math.max(80, (transition.duration || DEFAULT_MOVE_MS) * 0.65) : type === "fade" ? (transition.duration || FADE_MS) : 0;
+    this._queueBadge(badge || null, delay, token);
+
+    if (type === "move" || type === "fade") {
+      window.setTimeout(() => {
+        if (token !== this._token) return;
+        this._drawArrow();
+      }, delay);
+    } else {
+      this._drawArrow();
+    }
+  }
+
+  _queueBadge(badge, delay, token) {
+    if (this._badgeTimer) window.clearTimeout(this._badgeTimer);
+    if (!delay) {
+      this.badge = badge;
+      this._drawBadge();
+      return;
+    }
+    this.badge = null;
     this._drawBadge();
+    this._badgeTimer = window.setTimeout(() => {
+      if (token !== this._token) return;
+      this.badge = badge;
+      this._drawBadge();
+    }, delay);
+  }
+
+  _createPiece(color, type, square, anim) {
+    const el = document.createElement("div");
+    el.className = "piece" + (anim ? "" : " no-anim");
+    el.dataset.color = color;
+    el.dataset.type = type;
+    el.dataset.square = square;
+    el.dataset.piece = pieceKey(color, type);
+    const img = document.createElement("img");
+    img.src = PIECE_SRC[pieceKey(color, type)];
+    img.alt = `${color === "w" ? "White" : "Black"} ${type}`;
+    img.draggable = false;
+    el.appendChild(img);
+    el.style.transform = this._transform(square);
+    this.pieceLayer.appendChild(el);
+    if (!anim) {
+      // Force a reflow so later transitions are not batched with this placement.
+      void el.offsetWidth;
+      el.classList.remove("no-anim");
+    }
+    return el;
+  }
+
+  _setGraphic(el, color, type) {
+    const key = pieceKey(color, type);
+    if (el.dataset.piece === key) return;
+    el.dataset.color = color;
+    el.dataset.type = type;
+    el.dataset.piece = key;
+    const img = el.querySelector("img");
+    if (img) {
+      img.src = PIECE_SRC[key];
+      img.alt = `${color === "w" ? "White" : "Black"} ${type}`;
+    }
+  }
+
+  _place(el, square, anim) {
+    if (!anim) el.classList.add("no-anim");
+    el.dataset.square = square;
+    el.style.transform = this._transform(square);
+    el.style.opacity = "1";
+    el.classList.remove("capturing");
+    if (!anim) {
+      void el.offsetWidth;
+      el.classList.remove("no-anim");
+    }
+  }
+
+  _syncPieces(list, anim) {
+    const taken = new Set();
+    const nextMap = new Map();
+    for (const p of list) {
+      let el = this.pieces.get(p.square);
+      if (el && el.dataset.color === p.color && el.dataset.type === p.type && !taken.has(el)) {
+        taken.add(el);
+        this._place(el, p.square, anim);
+        nextMap.set(p.square, el);
+        continue;
+      }
+      el = null;
+      for (const cand of this.pieces.values()) {
+        if (taken.has(cand)) continue;
+        if (cand.dataset.color === p.color && cand.dataset.type === p.type) {
+          el = cand;
+          break;
+        }
+      }
+      if (el) {
+        taken.add(el);
+        this._place(el, p.square, anim);
+        nextMap.set(p.square, el);
+      } else {
+        const created = this._createPiece(p.color, p.type, p.square, anim);
+        nextMap.set(p.square, created);
+        taken.add(created);
+      }
+    }
+    for (const el of this.pieces.values()) {
+      if (!taken.has(el)) el.remove();
+    }
+    this.pieces = nextMap;
+  }
+
+  _relayoutPieces(anim) {
+    for (const [square, el] of this.pieces) {
+      this._place(el, square, anim);
+    }
+  }
+
+  _crossfade(list, duration, token) {
+    this.pieceLayer.classList.add("fading");
+    window.setTimeout(() => {
+      if (token !== this._token) return;
+      this._syncPieces(list, false);
+      this.pieceLayer.classList.remove("fading");
+    }, duration);
+  }
+
+  _animateMove(nextList, move, reverse, duration, token) {
+    const from = reverse ? move.to : move.from;
+    const to = reverse ? move.from : move.to;
+    let mover = this.pieces.get(from);
+    if (!mover) {
+      this._syncPieces(nextList, false);
+      return;
+    }
+
+    // Promotion: going forward, keep the pawn until it lands; going back, show a pawn first.
+    if (move.promotion) {
+      if (reverse) this._setGraphic(mover, move.color, move.piece || "p");
+    }
+
+    const capSq = captureSquare(move);
+    if (!reverse && capSq) {
+      const cap = this.pieces.get(capSq);
+      if (cap && cap !== mover) {
+        cap.classList.add("capturing");
+      }
+    }
+    if (reverse && capSq) {
+      const capType = move.captured || "p";
+      const capColor = move.color === "w" ? "b" : "w";
+      let cap = this._createPiece(capColor, capType, capSq, false);
+      cap.style.opacity = "0";
+      void cap.offsetWidth;
+      cap.style.opacity = "1";
+      this.pieces.set(capSq, cap);
+    }
+
+    this.pieces.delete(from);
+    this.pieces.set(to, mover);
+    this._place(mover, to, true);
+    mover.style.zIndex = "5";
+
+    const rook = rookCastle(move);
+    if (rook) {
+      const rFrom = reverse ? rook.to : rook.from;
+      const rTo = reverse ? rook.from : rook.to;
+      const rookEl = this.pieces.get(rFrom);
+      if (rookEl) {
+        this.pieces.delete(rFrom);
+        this.pieces.set(rTo, rookEl);
+        this._place(rookEl, rTo, true);
+        rookEl.style.zIndex = "4";
+      }
+    }
+
+    window.setTimeout(() => {
+      if (token !== this._token) return;
+      if (move.promotion && !reverse) this._setGraphic(mover, move.color, move.promotion);
+      mover.style.zIndex = "";
+      this._syncPieces(nextList, false);
+    }, duration + 20);
   }
 
   _drawHighlights() {
@@ -193,26 +447,6 @@ export class BoardView {
       rect.setAttribute("class", "last-move");
       rect.setAttribute("pointer-events", "none");
       g.appendChild(rect);
-    }
-  }
-
-  _drawPieces() {
-    const g = this.svg.querySelector(".pieces");
-    g.innerHTML = "";
-    for (const p of parseFenPieces(this.fen)) {
-      const { x, y } = this._xy(p.square);
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("x", String(x));
-      svg.setAttribute("y", String(y));
-      svg.setAttribute("width", "1");
-      svg.setAttribute("height", "1");
-      svg.setAttribute("viewBox", "0 0 45 45");
-      svg.setAttribute("class", "piece");
-      svg.setAttribute("data-square", p.square);
-      svg.setAttribute("pointer-events", "none");
-      svg.style.filter = "url(#piece-shadow)";
-      svg.innerHTML = PIECE_SVG[p.color + p.type.toUpperCase()] || "";
-      g.appendChild(svg);
     }
   }
 
@@ -244,12 +478,14 @@ export class BoardView {
   }
 
   _drawBadge() {
-    const g = this.svg.querySelector(".badges");
+    const g = this.overlay.querySelector(".badges");
     g.innerHTML = "";
     if (!this.badge) return;
     const { x, y } = this._xy(this.badge.square);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("pointer-events", "none");
+    group.setAttribute("class", "board-badge");
+    group.setAttribute("data-badge", this.badge.classification || "");
     const cx = x + 0.82;
     const cy = y + 0.18;
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -266,7 +502,6 @@ export class BoardView {
     text.setAttribute("dominant-baseline", "middle");
     text.setAttribute("class", "badge-text");
     const symbol = this.badge.symbol || "";
-    // Emoji badges are slightly smaller so they fit the circle.
     const emoji = /[👍📖]/.test(symbol);
     text.setAttribute("font-size", emoji ? "0.18" : symbol.length > 1 ? "0.14" : "0.18");
     text.setAttribute("font-weight", "700");
@@ -277,3 +512,5 @@ export class BoardView {
     g.appendChild(group);
   }
 }
+
+export { DEFAULT_MOVE_MS };

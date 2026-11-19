@@ -54,3 +54,16 @@ test("blunder demo includes Qxe5+", () => {
   assert.equal(game.moves[4].san, "Qxe5+");
   assert.equal(game.moves[4].color, "w");
 });
+
+test("records castle and en passant flags for animation", () => {
+  const castle = loadGame({ pgn: "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6 5. d4 exd4" });
+  const zeroZero = castle.moves.find((m) => m.san === "O-O");
+  assert.ok(zeroZero);
+  assert.ok((zeroZero.flags || "").includes("k"));
+  const ep = loadGame({ pgn: "1. e4 d5 2. e5 f5 3. exf6" });
+  const cap = ep.moves.find((m) => m.san === "exf6" || m.san.startsWith("exf6"));
+  assert.ok(cap);
+  assert.equal(cap.enPassant, true);
+  assert.equal(cap.capturedSquare, "f5");
+  assert.equal(cap.captured, "p");
+});

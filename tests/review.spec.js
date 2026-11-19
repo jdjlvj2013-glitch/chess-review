@@ -38,5 +38,34 @@ test("Byrne vs Fischer 17...Be6 is Brilliant or at least Best/Great", async ({ p
     window.__chessReview.goTo(i + 1);
   });
   await expect(page.locator("#class-title .class-name")).toBeVisible();
+  await expect(page.locator(".board-badge")).toBeVisible({ timeout: 2000 });
+  await expect(page.locator("img[data-piece], .piece[data-piece='bB'], .piece[data-piece='wK']").first()).toBeVisible();
+  await expect(page.locator(".piece[data-piece='wK'] img")).toHaveAttribute("src", /cburnett\/wK\.svg/);
   await page.screenshot({ path: resolve(root, "screenshot.png"), fullPage: true });
+});
+
+test("Play auto-plays, shows badges, Space pauses, and clicking a move pauses", async ({ page }) => {
+  const state0 = await analyzePgn(page, blunderPgn, "12");
+  expect(state0.moveCount).toBeGreaterThan(3);
+  await page.click("#nav-start");
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().ply)).toBe(0);
+  await page.selectOption("#play-speed", "500");
+  await page.click("#nav-play");
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().playing)).toBe(true);
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().ply)).toBeGreaterThanOrEqual(2);
+  await expect(page.locator(".board-badge")).toBeVisible();
+  await page.keyboard.press("Space");
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().playing)).toBe(false);
+  const mid = await page.evaluate(() => window.__chessReview.getState().ply);
+  expect(mid).toBeGreaterThanOrEqual(1);
+  await page.click("#nav-play");
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().playing)).toBe(true);
+  await page.locator('.move-san[data-ply="1"]').click();
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().playing)).toBe(false);
+  expect(await page.evaluate(() => window.__chessReview.getState().ply)).toBe(1);
+  await expect(page.locator(".board-badge")).toBeVisible();
+  // Step backward and forward — badge should remain after the slide.
+  await page.click("#nav-next");
+  await page.waitForTimeout(350);
+  await expect(page.locator(".board-badge")).toBeVisible();
 });
