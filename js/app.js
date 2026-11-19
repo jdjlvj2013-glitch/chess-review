@@ -635,6 +635,10 @@ function exposeDebug() {
     goTo,
     togglePlay,
     pausePlayback,
+    getFen: () => currentFen(),
+    getDomPieces: () => board.domPieces(),
+    whenSettled: () => board.whenSettled(),
+    fenAtPly,
     ready: !state.analyzing && state.reviews.length > 0 && state.reviews.every(Boolean),
   };
 }

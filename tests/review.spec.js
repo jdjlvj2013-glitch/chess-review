@@ -131,3 +131,138 @@ test.describe("playback does not scroll the page on a Pixel", () => {
     await assertPlaybackDoesNotScrollPage(page);
   });
 });
+
+function parseFenPieces(fen) {
+  const FILES = "abcdefgh";
+  const board = fen.split(" ")[0];
+  const pieces = [];
+  let r = 7;
+  let f = 0;
+  for (const ch of board) {
+    if (ch === "/") {
+      r -= 1;
+      f = 0;
+    } else if (/\d/.test(ch)) {
+      f += Number(ch);
+    } else {
+      const color = ch === ch.toUpperCase() ? "w" : "b";
+      pieces.push({ square: FILES[f] + (r + 1), type: ch.toLowerCase(), color, piece: color + ch.toUpperCase() });
+      f += 1;
+    }
+  }
+  return pieces;
+}
+
+async function assertPiecesMatchFen(page, label) {
+  await page.evaluate(() => window.__chessReview.whenSettled());
+  const result = await page.evaluate(() => {
+    const fen = window.__chessReview.getFen();
+    const ply = window.__chessReview.getState().ply;
+    const FILES = "abcdefgh";
+    const board = fen.split(" ")[0];
+    const expected = [];
+    let r = 7;
+    let f = 0;
+    for (const ch of board) {
+      if (ch === "/") {
+        r -= 1;
+        f = 0;
+      } else if (/\d/.test(ch)) {
+        f += Number(ch);
+      } else {
+        const color = ch === ch.toUpperCase() ? "w" : "b";
+        expected.push({ square: FILES[f] + (r + 1), color, type: ch.toLowerCase() });
+        f += 1;
+      }
+    }
+    const dom = window.__chessReview.getDomPieces();
+    return { fen, ply, expected, dom };
+  });
+  const live = result.dom.filter((p) => !p.capturing);
+  const bySquare = new Map();
+  for (const p of live) {
+    expect(p.square, `${label} ply ${result.ply}: piece without a square`).toBeTruthy();
+    expect(bySquare.has(p.square), `${label} ply ${result.ply}: two pieces on ${p.square}`).toBe(false);
+    bySquare.set(p.square, p);
+  }
+  expect(live.length, `${label} ply ${result.ply}: piece count ${live.length} vs ${result.expected.length}`).toBe(
+    result.expected.length
+  );
+  for (const exp of result.expected) {
+    const got = bySquare.get(exp.square);
+    expect(got, `${label} ply ${result.ply}: missing ${exp.color}${exp.type} on ${exp.square}`).toBeTruthy();
+    expect(got.color).toBe(exp.color);
+    expect(got.type).toBe(exp.type);
+  }
+  expect(result.dom.some((p) => p.capturing), `${label} ply ${result.ply}: captured piece still in the DOM`).toBe(false);
+}
+
+test("piece DOM matches FEN after every Byrne vs Fischer ply", async ({ page }) => {
+  const state = await analyzePgn(page, fischerPgn, "14");
+  const total = state.moveCount;
+  expect(total).toBe(82);
+
+  // 1) Auto-play at 0.5s per move.
+  await page.evaluate(() => window.__chessReview.goTo(0, { instant: true }));
+  await page.evaluate(() => window.__chessReview.whenSettled());
+  await page.selectOption("#play-speed", "500");
+  await page.locator("#nav-play").click({ force: true });
+  for (let ply = 1; ply <= total; ply++) {
+    await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().ply)).toBe(ply);
+    await assertPiecesMatchFen(page, "play");
+  }
+  await expect.poll(async () => page.evaluate(() => window.__chessReview.getState().playing)).toBe(false);
+
+  // 2) Step forward with arrow keys, including a burst of rapid presses.
+  await page.evaluate(() => window.__chessReview.goTo(0, { instant: true }));
+  await page.evaluate(() => window.__chessReview.whenSettled());
+  await assertPiecesMatchFen(page, "start");
+  for (let ply = 1; ply <= 20; ply++) {
+    await page.keyboard.press("ArrowRight");
+    await page.evaluate(() => window.__chessReview.whenSettled());
+    expect(await page.evaluate(() => window.__chessReview.getState().ply)).toBe(ply);
+    await assertPiecesMatchFen(page, "arrow");
+  }
+  for (let i = 0; i < 30; i++) {
+    await page.keyboard.press("ArrowRight");
+  }
+  await page.evaluate(() => window.__chessReview.whenSettled());
+  await assertPiecesMatchFen(page, "rapid");
+  const afterBurst = await page.evaluate(() => window.__chessReview.getState().ply);
+  expect(afterBurst).toBeGreaterThanOrEqual(50);
+  while ((await page.evaluate(() => window.__chessReview.getState().ply)) < total) {
+    await page.keyboard.press("ArrowRight");
+    await page.evaluate(() => window.__chessReview.whenSettled());
+    await assertPiecesMatchFen(page, "arrow-finish");
+  }
+  expect(await page.evaluate(() => window.__chessReview.getState().ply)).toBe(total);
+  await assertPiecesMatchFen(page, "end");
+
+  // 3) Step backward through the whole game, restoring captured pieces.
+  for (let ply = total - 1; ply >= 0; ply--) {
+    await page.keyboard.press("ArrowLeft");
+    await page.evaluate(() => window.__chessReview.whenSettled());
+    expect(await page.evaluate(() => window.__chessReview.getState().ply)).toBe(ply);
+    await assertPiecesMatchFen(page, "back");
+  }
+});
+
+test("en passant capture removes the pawn from its own square", async ({ page }) => {
+  const pgn = "1. e4 d5 2. e5 f5 3. exf6";
+  await analyzePgn(page, pgn, "12");
+  await page.evaluate(() => window.__chessReview.goTo(0, { instant: true }));
+  for (let ply = 1; ply <= 5; ply++) {
+    await page.keyboard.press("ArrowRight");
+    await page.evaluate(() => window.__chessReview.whenSettled());
+    await assertPiecesMatchFen(page, "ep-forward");
+  }
+  const after = await page.evaluate(() => window.__chessReview.getDomPieces());
+  expect(after.find((p) => p.square === "f5")).toBeFalsy();
+  expect(after.find((p) => p.square === "f6" && p.color === "w" && p.type === "p")).toBeTruthy();
+  await page.keyboard.press("ArrowLeft");
+  await page.evaluate(() => window.__chessReview.whenSettled());
+  await assertPiecesMatchFen(page, "ep-back");
+  const undone = await page.evaluate(() => window.__chessReview.getDomPieces());
+  expect(undone.find((p) => p.square === "f5" && p.color === "b" && p.type === "p")).toBeTruthy();
+  expect(undone.find((p) => p.square === "e5" && p.color === "w" && p.type === "p")).toBeTruthy();
+});

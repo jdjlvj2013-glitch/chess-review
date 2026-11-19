@@ -91,6 +91,9 @@ export class BoardView {
     this.pieces = new Map(); // square -> HTMLElement
     this._token = 0;
     this._badgeTimer = 0;
+    this._animTimer = 0;
+    this._settled = Promise.resolve();
+    this._resolveSettled = null;
     this._build();
   }
 
@@ -231,6 +234,24 @@ export class BoardView {
    * Apply a new position and decorations. `transition` is
    * { type: 'none'|'move'|'fade', move?, reverse?, duration? }.
    */
+  whenSettled() {
+    return this._settled || Promise.resolve();
+  }
+
+  /**
+   * Every piece element currently in the board DOM, including any that are
+   * mid-fade and no longer in the square map.
+   */
+  domPieces() {
+    return [...this.pieceLayer.querySelectorAll(".piece")].map((el) => ({
+      square: el.dataset.square || "",
+      color: el.dataset.color,
+      type: el.dataset.type,
+      piece: el.dataset.piece,
+      capturing: el.classList.contains("capturing"),
+    }));
+  }
+
   update({ fen, lastMove, badge, bestArrow, transition = { type: "none" } } = {}) {
     if (fen) this.fen = fen;
     this.lastMove = lastMove && lastMove.from ? lastMove : null;
@@ -240,26 +261,52 @@ export class BoardView {
     const next = parseFenPieces(this.fen);
     const type = transition?.type || "none";
     const token = ++this._token;
+    if (this._animTimer) {
+      window.clearTimeout(this._animTimer);
+      this._animTimer = 0;
+    }
+    this.pieceLayer.classList.remove("fading");
+    // A previous animation may have been interrupted. Drop any DOM nodes
+    // that are no longer in the square map (typically a captured piece).
+    this._removeOrphans();
+
+    const duration =
+      type === "move" ? transition.duration || DEFAULT_MOVE_MS : type === "fade" ? transition.duration || FADE_MS : 0;
+
+    if (this._resolveSettled) this._resolveSettled();
+    let resolveSettled;
+    this._settled = new Promise((resolve) => {
+      resolveSettled = resolve;
+    });
+    this._resolveSettled = resolveSettled;
 
     if (type === "move" && transition.move) {
-      this._animateMove(next, transition.move, Boolean(transition.reverse), transition.duration || DEFAULT_MOVE_MS, token);
+      this._animateMove(next, transition.move, Boolean(transition.reverse), duration, token);
     } else if (type === "fade") {
-      this._crossfade(next, transition.duration || FADE_MS, token);
+      this._crossfade(next, duration, token);
     } else {
       this._syncPieces(next, false);
     }
 
-    const delay =
-      type === "move" ? Math.max(80, (transition.duration || DEFAULT_MOVE_MS) * 0.65) : type === "fade" ? (transition.duration || FADE_MS) : 0;
+    const delay = type === "move" ? Math.max(80, duration * 0.65) : duration;
     this._queueBadge(badge || null, delay, token);
 
-    if (type === "move" || type === "fade") {
-      window.setTimeout(() => {
-        if (token !== this._token) return;
+    const finish = () => {
+      if (token === this._token) {
+        this._syncPieces(parseFenPieces(this.fen), false);
         this._drawArrow();
-      }, delay);
+        this.pieceLayer.classList.remove("fading");
+      }
+      if (this._resolveSettled === resolveSettled) {
+        this._resolveSettled = null;
+        resolveSettled();
+      }
+    };
+
+    if (duration > 0) {
+      this._animTimer = window.setTimeout(finish, duration + 30);
     } else {
-      this._drawArrow();
+      finish();
     }
   }
 
@@ -326,25 +373,57 @@ export class BoardView {
     }
   }
 
+  _allPieceElements() {
+    return [...this.pieceLayer.querySelectorAll(".piece")];
+  }
+
+  _removeOrphans() {
+    const known = new Set(this.pieces.values());
+    for (const el of this._allPieceElements()) {
+      if (!known.has(el) || el.classList.contains("capturing")) {
+        el.remove();
+      }
+    }
+    for (const [square, el] of [...this.pieces]) {
+      if (!el.parentNode) this.pieces.delete(square);
+    }
+  }
+
+  /**
+   * Make the DOM match `list` exactly: one element per occupied square,
+   * nothing on empty squares, no leftover captured pieces.
+   */
   _syncPieces(list, anim) {
+    const pool = this._allPieceElements();
     const taken = new Set();
     const nextMap = new Map();
     for (const p of list) {
       let el = this.pieces.get(p.square);
-      if (el && el.dataset.color === p.color && el.dataset.type === p.type && !taken.has(el)) {
+      if (
+        el &&
+        el.parentNode &&
+        el.dataset.color === p.color &&
+        el.dataset.type === p.type &&
+        !taken.has(el) &&
+        !el.classList.contains("capturing")
+      ) {
         taken.add(el);
         this._place(el, p.square, anim);
         nextMap.set(p.square, el);
         continue;
       }
       el = null;
-      for (const cand of this.pieces.values()) {
-        if (taken.has(cand)) continue;
-        if (cand.dataset.color === p.color && cand.dataset.type === p.type) {
+      let fallback = null;
+      for (const cand of pool) {
+        if (taken.has(cand) || !cand.parentNode || cand.classList.contains("capturing")) continue;
+        if (cand.dataset.color !== p.color || cand.dataset.type !== p.type) continue;
+        if (cand.dataset.square === p.square) {
           el = cand;
           break;
         }
+        if (!fallback) fallback = cand;
       }
+      el = el || fallback;
       if (el) {
         taken.add(el);
         this._place(el, p.square, anim);
@@ -355,7 +434,7 @@ export class BoardView {
         taken.add(created);
       }
     }
-    for (const el of this.pieces.values()) {
+    for (const el of pool) {
       if (!taken.has(el)) el.remove();
     }
     this.pieces = nextMap;
@@ -376,6 +455,17 @@ export class BoardView {
     }, duration);
   }
 
+  _fadeOutCaptured(el, token) {
+    if (!el) return;
+    el.classList.add("capturing");
+    el.style.zIndex = "1";
+    el.dataset.square = "";
+    window.setTimeout(() => {
+      if (el.parentNode) el.remove();
+      if (token === this._token) this._removeOrphans();
+    }, 180);
+  }
+
   _animateMove(nextList, move, reverse, duration, token) {
     const from = reverse ? move.to : move.from;
     const to = reverse ? move.from : move.to;
@@ -394,13 +484,14 @@ export class BoardView {
     if (!reverse && capSq) {
       const cap = this.pieces.get(capSq);
       if (cap && cap !== mover) {
-        cap.classList.add("capturing");
+        this.pieces.delete(capSq);
+        this._fadeOutCaptured(cap, token);
       }
     }
     if (reverse && capSq) {
       const capType = move.captured || "p";
       const capColor = move.color === "w" ? "b" : "w";
-      let cap = this._createPiece(capColor, capType, capSq, false);
+      const cap = this._createPiece(capColor, capType, capSq, false);
       cap.style.opacity = "0";
       void cap.offsetWidth;
       cap.style.opacity = "1";
@@ -429,8 +520,7 @@ export class BoardView {
       if (token !== this._token) return;
       if (move.promotion && !reverse) this._setGraphic(mover, move.color, move.promotion);
       mover.style.zIndex = "";
-      this._syncPieces(nextList, false);
-    }, duration + 20);
+    }, duration);
   }
 
   _drawHighlights() {
